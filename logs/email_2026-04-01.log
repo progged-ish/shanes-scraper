@@ -1,0 +1,25 @@
+2026-04-01 03:01:10,920 - INFO - Dashboard file found: /home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.txt (5.3 KB)
+2026-04-01 03:01:10,920 - ERROR - FROM_PASSWORD not configured
+2026-04-01 03:01:10,920 - ERROR - Aborted: Email configuration incomplete
+2026-04-01 03:01:27,917 - INFO - Dashboard file found: /home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.txt (5.3 KB)
+2026-04-01 03:01:27,917 - INFO - Starting email send process...
+2026-04-01 03:01:27,917 - INFO - Attempt 1/3
+2026-04-01 03:01:49,198 - ERROR - ✗ Unexpected error: ConnectionRefusedError: [Errno 111] Connection refused
+2026-04-01 03:01:49,199 - INFO - Waiting 300 seconds before retry...
+2026-04-01 03:04:31,919 - INFO - Dashboard file found: /home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.txt (5.3 KB)
+2026-04-01 03:04:31,919 - INFO - Starting email send process...
+2026-04-01 03:04:31,919 - INFO - Attempt 1/3
+2026-04-01 03:04:47,105 - INFO - Dashboard file found: /home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.txt (5.3 KB)
+2026-04-01 03:04:47,105 - INFO - Starting email send process...
+2026-04-01 03:04:47,105 - INFO - Attempt 1/3
+2026-04-01 03:04:53,193 - ERROR - ✗ Unexpected error: ConnectionRefusedError: [Errno 111] Connection refused
+2026-04-01 03:04:53,194 - INFO - Waiting 300 seconds before retry...
+2026-04-01 03:05:08,256 - ERROR - ✗ Unexpected error: ConnectionRefusedError: [Errno 111] Connection refused
+2026-04-01 03:05:08,256 - INFO - Waiting 10 seconds before retry...
+2026-04-01 03:05:18,257 - INFO - Attempt 2/3
+2026-04-01 03:05:39,380 - ERROR - ✗ Unexpected error: ConnectionRefusedError: [Errno 111] Connection refused
+2026-04-01 03:05:39,380 - INFO - Waiting 10 seconds before retry...
+2026-04-01 03:05:49,381 - INFO - Attempt 3/3
+2026-04-01 03:06:10,611 - ERROR - ✗ Unexpected error: ConnectionRefusedError: [Errno 111] Connection refused
+2026-04-01 03:06:10,612 - ERROR - Final failure - sending notification
+2026-04-01 03:06:32,006 - ERROR - Failed to send failure notification: [Errno 111] Connection refused

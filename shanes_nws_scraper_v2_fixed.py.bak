@@ -1,0 +1,693 @@
+#!/usr/bin/env python3
+"""
+Shane's NWS Discussion Scraper - Version 2.0 with AI Summarization
+Enhanced version with Hermes AI-powered bulletins for each forecast office.
+"""
+
+import os
+import sys
+import json
+import re
+import folium
+import html
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
+from collections import defaultdict
+
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ai_summarizer.summarizer import HermesSummarizer, load_api_config
+
+
+# --- Configuration ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+CONFIG_DIR = os.path.join(BASE_DIR, 'config')
+
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(CONFIG_DIR, exist_ok=True)
+
+# Load AI configuration
+ai_config = load_api_config()
+summarizer = HermesSummarizer(
+    api_key=ai_config['api_key'] if ai_config['api_key'] else None
+) if ai_config['api_key'] else None
+
+# --- NWS Office Data ---
+all_offices_synoptic = {
+    'Canada': ['YVR', 'YYC', 'YWG', 'YYZ', 'YUL', 'YHZ'],
+    'California': ['EKA', 'MTR', 'STO', 'HNX', 'LOX', 'SGX'],
+    'Oregon': ['PQR', 'PDT', 'MFR'],
+    'Washington': ['SEW', 'OTX'],
+    'Alaska': ['ANC', 'FAI', 'JNU'],
+    'Hawaii': ['HFO'],
+    'Idaho': ['BOI', 'PIH'],
+    'Nevada': ['REV', 'LKN', 'VEF'],
+    'Utah': ['SLC'],
+    'Arizona': ['FGZ', 'PSR', 'TWC'],
+    'Montana': ['TFX', 'GGW', 'BYZ', 'MSO'],
+    'Wyoming': ['RIW', 'CYS'],
+    'Colorado': ['BOU', 'GJT', 'PUB'],
+    'New Mexico': ['ABQ'],
+    'North Dakota': ['BIS', 'FGF'],
+    'South Dakota': ['ABR', 'FSD', 'UNR'],
+    'Nebraska': ['GID', 'LBF', 'OAX'],
+    'Kansas': ['DDC', 'GLD', 'ICT', 'TOP'],
+    'Oklahoma': ['OUN', 'TSA'],
+    'Texas': ['AMA', 'FWD', 'HGX', 'MAF', 'SJT', 'CRP', 'BRO', 'EPZ'],
+    'Minnesota': ['DLH', 'MPX', 'FGF'],
+    'Iowa': ['DMX', 'DVN', 'ARX'],
+    'Missouri': ['EAX', 'LSX', 'SGF'],
+    'Arkansas': ['LZK', 'SHV'],
+    'Louisiana': ['LIX', 'SHV'],
+    'Wisconsin': ['ARX', 'GRB', 'MKX'],
+    'Illinois': ['ILX', 'LOT', 'LSX'],
+    'Michigan': ['APX', 'DTX', 'GRR', 'MQT'],
+    'Indiana': ['IND', 'IWX', 'LMK'],
+    'Ohio': ['CLE', 'ILN', 'PBZ'],
+    'Kentucky': ['JKL', 'LMK', 'PAH'],
+    'Tennessee': ['OHX', 'MRX', 'MEG'],
+    'Mississippi': ['JAN', 'MEG'],
+    'Alabama': ['BMX', 'HUN', 'MOB'],
+    'Florida': ['JAX', 'KEY', 'MFL', 'MLB', 'TAE', 'TBW'],
+    'Georgia': ['FFC', 'JAX', 'TAE'],
+    'South Carolina': ['CHS', 'GSP', 'CAE', 'ILM'],
+    'North Carolina': ['RAH', 'GSP', 'MHX', 'ILM', 'RNK'],
+    'Virginia': ['AKQ', 'LWX', 'RNK'],
+    'West Virginia': ['RLX', 'LWX', 'PBZ'],
+    'Pennsylvania': ['CTP', 'PHI', 'PBZ'],
+    'New Jersey': ['PHI', 'OKX'],
+    'Delaware': ['PHI'],
+    'Maryland': ['LWX'],
+    'New York': ['ALY', 'BUF', 'BGM', 'OKX'],
+    'Connecticut': ['BOX', 'OKX'],
+    'Rhode Island': ['BOX'],
+    'Massachusetts': ['BOX'],
+    'Vermont': ['BTV', 'ALY'],
+    'New Hampshire': ['GYX', 'BOX'],
+    'Maine': ['GYX', 'CAR']
+}
+
+STATE_ABBREVIATIONS = {
+    'Canada': 'CAN', 'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+    'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+    'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL',
+    'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
+    'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN',
+    'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+    'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+    'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR',
+    'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD',
+    'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA',
+    'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY'
+}
+
+def get_state_abbrev(state):
+    return STATE_ABBREVIATIONS.get(state, state)
+
+# NWS Office Coordinates
+nws_office_coords = {
+    'YVR': [49.28, -123.12], 'YYC': [51.04, -114.07], 'YWG': [49.89, -97.13],
+    'YYZ': [43.65, -79.38], 'YUL': [45.50, -73.56], 'YHZ': [44.64, -63.57],
+    'EKA': [40.8, -124.16], 'MTR': [37.72, -122.22], 'STO': [38.56, -121.52],
+    'HNX': [36.31, -119.65], 'LOX': [34.19, -119.17], 'SGX': [33.03, -117.07],
+    'PQR': [45.58, -122.59], 'PDT': [45.66, -118.79], 'MFR': [42.36, -122.87],
+    'SEW': [47.44, -122.31], 'OTX': [47.62, -117.52], 'BOI': [43.61, -116.2],
+    'PIH': [42.85, -112.45], 'REV': [39.52, -119.81], 'LKN': [40.8, -115.17],
+    'VEF': [36.08, -115.16], 'SLC': [40.76, -111.89], 'FGZ': [35.19, -111.65],
+    'PSR': [33.44, -112.07], 'TWC': [32.22, -110.97], 'TFX': [47.48, -111.37],
+    'GGW': [48.21, -106.63], 'BYZ': [45.8, -108.54], 'MSO': [46.91, -114.08],
+    'RIW': [43.06, -108.47], 'CYS': [41.15, -104.81], 'BOU': [40.02, -105.24],
+    'GJT': [39.11, -108.53], 'PUB': [38.28, -104.51], 'ABQ': [35.04, -106.62],
+    'BIS': [46.77, -100.75], 'FGF': [46.9, -96.81], 'ABR': [45.45, -98.42],
+    'FSD': [43.58, -96.73], 'UNR': [44.08, -103.2], 'GID': [40.96, -98.33],
+    'LBF': [41.13, -100.68], 'OAX': [41.31, -96.01], 'DDC': [37.76, -99.96],
+    'GLD': [39.36, -101.69], 'ICT': [37.65, -97.43], 'TOP': [39.07, -95.62],
+    'OUN': [35.23, -97.46], 'TSA': [36.19, -95.88], 'AMA': [35.22, -101.71],
+    'FWD': [32.74, -97.3], 'HGX': [29.98, -95.35], 'MAF': [31.94, -102.18],
+    'SJT': [31.37, -100.49], 'CRP': [27.77, -97.5], 'BRO': [25.91, -97.42],
+    'EPZ': [31.8, -106.37], 'DLH': [46.83, -92.18], 'MPX': [44.85, -93.46],
+    'DMX': [41.73, -93.65], 'DVN': [41.61, -90.58], 'ARX': [43.82, -91.19],
+    'EAX': [39.29, -94.72], 'LSX': [38.75, -90.37], 'SGF': [37.23, -93.38],
+    'LZK': [34.83, -92.23], 'SHV': [32.46, -93.84], 'LIX': [30.43, -90.08],
+    'GRB': [44.48, -88.13], 'MKX': [42.89, -88.09], 'ILX': [39.87, -89.67],
+    'LOT': [41.6, -88.08], 'APX': [44.9, -84.79], 'DTX': [42.41, -83.42],
+    'GRR': [42.88, -85.52], 'MQT': [46.53, -87.55], 'IND': [39.71, -86.29],
+    'IWX': [41.18, -85.7], 'LMK': [38.17, -85.73], 'CLE': [41.4, -81.86],
+    'ILN': [39.42, -83.79], 'PBZ': [40.35, -80.21], 'JKL': [37.58, -83.31],
+    'PAH': [37.06, -88.77], 'OHX': [36.25, -86.51], 'MRX': [35.82, -83.99],
+    'MEG': [35.04, -89.98], 'JAN': [32.22, -90.1], 'BMX': [32.54, -86.07],
+    'HUN': [33.45, -86.99], 'MOB': [30.41, -88.21], 'JAX': [30.33, -81.67],
+    'KEY': [24.58, -81.79], 'MFL': [25.77, -80.25], 'MLB': [30.16, -87.33],
+    'TAE': [30.49, -84.34], 'TBW': [29.27, -87.54], 'FFC': [33.82, -84.26],
+    'CHS': [32.89, -80.04], 'GSP': [34.74, -82.12], 'CAE': [33.53, -81.17],
+    'ILM': [32.89, -81.03], 'RAH': [36.61, -78.78], 'MHX': [34.26, -77.38],
+    'RNK': [31.28, -79.27], 'AKQ': [38.84, -77.49], 'LWX': [38.84, -76.5],
+    'RLX': [38.39, -81.95], 'CTP': [40.29, -76.78], 'PHI': [39.87, -75.24],
+    'OKX': [38.84, -77.0], 'BTV': [44.56, -72.58], 'GYX': [43.25, -70.8],
+    'CAR': [44.31, -69.77], 'ANC': [61.2, -149.92], 'FAI': [61.22, -149.92],
+    'JNU': [57.2, -152.4], 'HFO': [21.32, -157.92], 'HUN': [33.45, -86.99]
+}
+
+# Weather Keywords for extraction
+KEYWORDS = [
+    'front', 'fronts', 'trough', 'troughs', 'dry line', 'dryline', 'ridge',
+    'shortwave', 'jet streak', 'surface low', 'upper low', 'record high',
+    'record low', 'record precipitation', 'record snowfall', 'arctic', 'tornado',
+    'severe', 'thunderstorm', 'wind shear', 'gale', 'squall', 'freeze', 'ice'
+]
+
+KEYWORD_COLORS = {
+    'front': '#FFADAD', 'fronts': '#FFADAD', 'trough': '#FFD6A5', 'troughs': '#FFD6A5',
+    'shortwave': '#FFD6A5', 'dry line': '#FDFFB6', 'dryline': '#FDFFB6',
+    'ridge': '#CAFFBF', 'jet streak': '#9BF6FF', 'surface low': '#A0C4FF',
+    'upper low': '#A0C4FF', 'record high': '#ffcccb', 'record low': '#add8e6',
+    'record precipitation': '#90ee90', 'record snowfall': '#d3d3d3', 'arctic': '#ADD8E6',
+    'tornado': '#FF6B6B', 'severe': '#FF6B6B', 'thunderstorm': '#4ECDC4',
+    'wind shear': '#FFE66D', 'gale': '#95E1D3', 'squall': '#F38181',
+    'freeze': '#AA96DA', 'ice': '#FCBAD3'
+}
+
+
+def parse_zulu_timestamp(zulu_str):
+    """Parse NWS Zulu timestamp from header like 'FXUS66 KMTR 311029'."""
+    try:
+        day, hour, minute = int(zulu_str[0:2]), int(zulu_str[2:4]), int(zulu_str[4:6])
+        now_utc = datetime.now(timezone.utc)
+        target_date = now_utc - relativedelta(months=1) if day > now_utc.day else now_utc
+        return target_date.replace(day=day, hour=hour, minute=minute, second=0, microsecond=0)
+    except (ValueError, IndexError):
+        return None
+
+def fetch_afd(wfo):
+    """
+    Fetch Area Forecast Discussion using HTML scraping.
+    Uses BeautifulSoup to parse the <pre> tag from the NWS product page.
+    
+    Args:
+        wfo: Weather Forecast Office identifier (e.g., 'ANC', 'DFW')
+    
+    Returns:
+        Tuple of (discussion_text, discussion_url, timestamp_obj)
+    """
+    url = f"https://forecast.weather.gov/product.php?site={wfo.upper()}&issuedby={wfo.upper()}&product=AFD&format=txt&version=1&glossary=0"
+    
+    try:
+        # Note: No custom headers - use default requests User-Agent
+        # Use 15s timeout as per original working script
+        response = requests.get(url, timeout=15)
+        
+        # Handle 400/404 errors
+        if response.status_code == 400 or response.status_code == 404:
+            return f"Error {response.status_code} for {wfo.upper()}", url, None
+        
+        response.raise_for_status()
+        
+        # Parse HTML with BeautifulSoup
+        soup = BeautifulSoup(response.text, 'html.parser')
+        pre = soup.find('pre')
+        
+        if pre:
+            text = pre.get_text()
+            # Extract Zulu timestamp from header
+            zulu_match = re.search(r'^[A-Z]{4}\d{2}\s+K[A-Z]{3}\s+(\d{6})', text, re.MULTILINE)
+            timestamp_obj = parse_zulu_timestamp(zulu_match.group(1)) if zulu_match else None
+            return text, url, timestamp_obj
+        else:
+            return f"Could not find discussion text for {wfo.upper()}", url, None
+            
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching {wfo.upper()}: {str(e)}", url, None
+
+
+def get_ai_summary(text: str) -> str:
+    """
+    Generate AI-powered summary using Hermes.
+    
+    Args:
+        text: Forecast discussion text
+        
+    Returns:
+        AI-generated summary string
+    """
+    if not summarizer:
+        return "[AI Summary unavailable - API key not configured]"
+    
+    try:
+        summary = summarizer.generate_summary(text)
+        return summary
+    except Exception as e:
+        return f"[AI Summary error: {str(e)[:100]}]"
+
+
+def highlight_keywords(text: str, color_map: dict) -> str:
+    """Apply colored span tags to keywords in text."""
+    highlighted = html.escape(text)
+    sorted_kws = sorted(color_map.keys(), key=len, reverse=True)
+    
+    for kw in sorted_kws:
+        color = color_map.get(kw, '#E0E0E0')
+        pattern = r'(\b' + re.escape(kw) + r'\b)'
+        highlighted = re.sub(
+            pattern,
+            lambda m: f'<span style="background-color:{color}; font-weight:bold; padding: 2px 0; border-radius: 3px;">{m.group(1)}</span>',
+            highlighted,
+            flags=re.IGNORECASE
+        )
+    
+    return highlighted
+
+
+def create_folium_map(office_coords: dict) -> str:
+    """Create Folium map with office locations."""
+    center = [45, -98.5795]
+    m = folium.Map(location=center, zoom_start=4, tiles='CartoDB positron')
+    
+    for office, coords in office_coords.items():
+        popup_html = f"""<b>{office}</b><br>
+                       <a href="#" onclick="openDiscussion('{office}')">Open AFD</a>"""
+        folium.CircleMarker(
+            location=coords, radius=5,
+            popup=folium.Popup(popup_html, max_width=200),
+            color='#007bff', fill_color='#007bff',
+            fill=True, fill_opacity=0.7
+        ).add_to(m)
+    
+    # Add CSS for full-screen map
+    m.get_root().html.add_child(folium.Element('<style>html, body, #map { height: 100%; margin: 0; padding: 0; width: 100%; } #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }</style>'))
+    
+    return m._repr_html_()
+
+
+def generate_dashboard_html(
+    processed_data: dict,
+    execution_time: str,
+    version: str
+) -> str:
+    """Generate complete HTML dashboard."""
+    
+    # Header
+    html_output = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shane's NWS Discussion Scraper v2.0 - AI Enhanced</title>
+    <script src="https://cdn.jsdelivr.net/npm/folium@1.6.0/dist/folium.min.js"></script>
+    <style>
+        * {{ box-sizing: border-box; }}
+        body, html {{
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            scroll-behavior: smooth;
+        }}
+        .dashboard {{
+            display: flex;
+            height: 100vh;
+        }}
+        .map-pane {{
+            width: 40%;
+            height: 100%;
+            position: relative;
+        }}
+        .content-pane {{
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }}
+        .map-frame {{
+            width: 100%;
+            height: 100%;
+            border: none;
+        }}
+        h1 {{ color: #1a5f7a; margin-bottom: 20px; }}
+        h2 {{ color: #2c5282; border-bottom: 2px solid #cbd5e0; padding-bottom: 10px; margin-top: 30px; }}
+        h3 {{ color: #2b6cb0; margin-top: 20px; }}
+        h4 {{ color: #4299e1; margin-top: 15px; }}
+        hr {{ border: none; border-top: 1px solid #e2e8f0; margin: 15px 0; }}
+        
+        .version-info {{
+            background: #e6fffa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #38b2ac;
+        }}
+        .state-links {{
+            background: #ebf8ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }}
+        .state-links a {{
+            display: inline-block;
+            margin: 3px;
+            padding: 5px 10px;
+            background: #3182ce;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }}
+        .state-links a:hover {{ background: #2c5282; }}
+        
+        .ai-summary {{
+            background: #fff;
+            padding: 12px 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            margin: 10px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .ai-summary::before {{
+            content: "🤖 AI Summary:";
+            font-weight: bold;
+            color: #4a5568;
+            display: block;
+            margin-bottom: 5px;
+        }}
+        .keyword-summary {{
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }}
+        
+        details {{
+            background: #fff;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }}
+        summary {{
+            cursor: pointer;
+            font-weight: 500;
+            color: #2d3748;
+        }}
+        summary:hover {{ color: #4299e1; }}
+        
+        pre {{
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+        ul {{ padding-left: 20px; }}
+        li {{ margin: 5px 0; }}
+        
+        .back-to-top {{
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 10px;
+            background: #4299e1;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 12px;
+        }}
+        .back-to-top:hover {{ background: #3182ce; }}
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="map-pane">
+            <iframe class="map-frame" srcdoc="{html.escape(processed_data['map_html'])}"></iframe>
+        </div>
+        <div class="content-pane">
+            <h1 id="top">Shane's NWS Discussion Scraper v2.0</h1>
+            <div class="version-info">
+                <strong>Version:</strong> {version}<br>
+                <strong>Generated:</strong> {execution_time}<br>
+                <strong>AI Summary:</strong> Enabled (Hermes API)
+            </div>
+            
+            <div class="state-links">
+                <h3>Jump to State</h3>
+                {' '.join(f'<a href="#{get_state_abbrev(state).replace(" ", "_")}">{get_state_abbrev(state)}</a>' for state in sorted(processed_data.keys()))}
+            </div>
+            
+            <h2>Keyword Summary</h2>
+            {generate_keyword_summary(processed_data['keyword_map'], processed_data['keyword_counts'], processed_data['keyword_occurrences'])}
+            
+            {generate_office_summaries(processed_data['summaries'])}
+        </div>
+    </div>
+    
+    <script>
+        function openDiscussion(office) {
+            window.location.href = 'https://forecast.weather.gov/product.php?site=' + office;
+        }
+        
+        // Add AI summary expand/collapse functionality
+        document.querySelectorAll('.ai-summary').forEach(summary => {
+            const toggle = summary.querySelector('summary');
+            if (toggle) {
+                toggle.addEventListener('click', function() {
+                    this.parentElement.classList.toggle('collapsed');
+                });
+            }
+        });
+    </script>
+</body>
+</html>"""
+    
+    return html_output
+
+
+def generate_keyword_summary(keyword_map: dict, keyword_counts: dict, keyword_occurrences: dict = None) -> str:
+    """Generate keyword summary section with clickable links to text occurrences."""
+    html_parts = []
+    
+    for kw in sorted(keyword_counts.keys()):
+        count = keyword_counts[kw]
+        color = KEYWORD_COLORS.get(kw.lower(), '#E0E0E0')
+        display_kw = ' '.join(word.capitalize() for word in kw.split())
+        
+        html_parts.append(f"""
+            <details>
+                <summary><span style="background-color:{color}; padding: 3px 8px; border-radius: 3px; font-weight: bold;">{display_kw}</span> ({count} occurrences)</summary>
+                <ul>
+        """)
+        
+        # If we have specific occurrences data, use it
+        if keyword_occurrences and kw.lower() in keyword_occurrences:
+            for occ in keyword_occurrences[kw.lower()]:
+                office = occ.get('office', '')
+                state = occ.get('state', '')
+                text = occ.get('text', '')
+                if office:
+                    html_parts.append(f'            <li><a href="#{office.upper()}"><strong>{get_state_abbrev(state)} - {office.upper()}</strong></a><br><small>"{text[:50]}..."</small></li>')
+        else:
+            # Fallback: show office locations
+            for state in sorted(keyword_map.get(kw.lower(), {}).keys()):
+                for office in sorted(keyword_map[kw.lower()][state]):
+                    html_parts.append(f'            <li><a href="#{office.upper()}">{get_state_abbrev(state)} - {office.upper()}</a></li>')
+        
+        html_parts.append("""
+                </ul>
+            </details>
+        """)
+    
+    return '\n'.join(html_parts)
+
+
+def generate_office_summaries(summaries: dict) -> str:
+    """Generate office-by-office summaries section."""
+    html_parts = []
+    
+    for state in sorted(summaries.keys()):
+        state_id = get_state_abbrev(state).replace(' ', '_')
+        
+        html_parts.append(f"""
+            <h2 id="{state_id}">--- {state.upper()} ---</h2>
+        """)
+        
+        for office in sorted(summaries[state].keys()):
+            data = summaries[state][office]
+            office_id = office.upper()
+            
+            html_parts.append(f"""
+                <hr>
+                <h3 id="{office_id}">NWS Office: {office.upper()}</h3>
+                <h4>🤖 AI-BULLETIN:</h4>
+                <div class="ai-summary">
+                    {html.escape(data['ai_summary'])}
+                </div>
+                <h4>🔑 Keyword Features:</h4>
+            """)
+            
+            if data['keyword_summary']:
+                html_parts.append('<ul>')
+                for item in data['keyword_summary']:
+                    html_parts.append(f'                <li>{highlight_keywords(item, KEYWORD_COLORS)}</li>')
+                html_parts.append('</ul>')
+            else:
+                html_parts.append('<p><em>No significant keywords detected</em></p>')
+            
+            html_parts.append(f"""
+                <details>
+                    <summary><strong>Full Discussion Text</strong></summary>
+                    <pre>{html.escape(data['full_text'])}</pre>
+                </details>
+                <p><strong>Full AFD:</strong> <a href="{data['url']}" target="_blank">{data['url']}</a></p>
+                <a href="#top" class="back-to-top">Back to Top</a>
+            """)
+    
+    return '\n'.join(html_parts)
+
+
+
+
+nws_office_coords = {
+        'YVR': [49.28, -123.12], 'YYC': [51.04, -114.07], 'YWG': [49.89, -97.13], 'YYZ': [43.65, -79.38], 'YUL': [45.50, -73.56], 'YHZ': [44.64, -63.57],
+        'EKA': [40.8, -124.16], 'MTR': [37.72, -122.22], 'STO': [38.56, -121.52], 'HNX': [36.31, -119.65], 'LOX': [34.19, -119.17], 'SGX': [33.03, -117.07], 'PQR': [45.58, -122.59], 'PDT': [45.66, -118.79], 'MFR': [42.36, -122.87], 'SEW': [47.44, -122.31], 'OTX': [47.62, -117.52], 'BOI': [43.61, -116.2], 'PIH': [42.85, -112.45], 'REV': [39.52, -119.81], 'LKN': [40.8, -115.17], 'VEF': [36.08, -115.16], 'SLC': [40.76, -111.89], 'FGZ': [35.19, -111.65], 'PSR': [33.44, -112.07], 'TWC': [32.22, -110.97], 'TFX': [47.48, -111.37], 'GGW': [48.21, -106.63], 'BYZ': [45.8, -108.54], 'MSO': [46.91, -114.08], 'RIW': [43.06, -108.47], 'CYS': [41.15, -104.81], 'BOU': [40.02, -105.24], 'GJT': [39.11, -108.53], 'PUB': [38.28, -104.51], 'ABQ': [35.04, -106.62], 'BIS': [46.77, -100.75], 'FGF': [46.9, -96.81], 'ABR': [45.45, -98.42], 'FSD': [43.58, -96.73], 'UNR': [44.08, -103.2], 'GID': [40.96, -98.33], 'LBF': [41.13, -100.68], 'OAX': [41.31, -96.01], 'DDC': [37.76, -99.96], 'GLD': [39.36, -101.69], 'ICT': [37.65, -97.43], 'TOP': [39.07, -95.62], 'OUN': [35.23, -97.46], 'TSA': [36.19, -95.88], 'AMA': [35.22, -101.71], 'FWD': [32.74, -97.3], 'HGX': [29.98, -95.35], 'MAF': [31.94, -102.18], 'SJT': [31.37, -100.49], 'CRP': [27.77, -97.5], 'BRO': [25.91, -97.42], 'EPZ': [31.8, -106.37], 'DLH': [46.83, -92.18], 'MPX': [44.85, -93.46], 'DMX': [41.73, -93.65], 'DVN': [41.61, -90.58], 'ARX': [43.82, -91.19], 'EAX': [39.29, -94.72], 'LSX': [38.75, -90.37], 'SGF': [37.23, -93.38], 'LZK': [34.83, -92.23], 'SHV': [32.46, -93.84], 'LIX': [30.43, -90.08], 'GRB': [44.48, -88.13], 'MKX': [42.89, -88.09], 'ILX': [39.87, -89.67], 'LOT': [41.6, -88.08], 'APX': [44.9, -84.79], 'DTX': [42.41, -83.42], 'GRR': [42.88, -85.52], 'MQT': [46.53, -87.55], 'IND': [39.71, -86.29], 'IWX': [41.18, -85.7], 'LMK': [38.17, -85.73], 'CLE': [41.4, -81.86], 'ILN': [39.42, -83.79], 'PBZ': [40.35, -80.21], 'JKL': [37.58, -83.31], 'PAH': [37.06, -88.77], 'OHX': [36.25, -86.51], 'MRX': [35.82, -83.99], 'MEG': [35.04, -89.98], 'JAN': [32.52, -90.03], 'BMX': [33.42, -86.81], 'HUN': [33.83, -87.42], 'MOB': [30.41, -88.06], 'JAX': [30.33, -81.67], 'KEY': [24.65, -81.67], 'MFL': [26.01, -80.19], 'MLB': [30.09, -87.23], 'TAE': [30.19, -81.77], 'TBW': [30.4, -84.27], 'FFC': [32.27, -82.31], 'CHS': [32.89, -80.04], 'GSP': [34.73, -82.13], 'CAE': [33.53, -81.27], 'ILM': [34.99, -82.31], 'RAH': [36.51, -78.67], 'MHX': [34.56, -76.7], 'RNK': [35.23, -77.18], 'AKQ': [37.53, -77.13], 'LWX': [38.96, -78.53], 'RLX': [38.63, -81.8], 'CTP': [40.95, -76.92], 'PHI': [39.87, -75.24], 'OKX': [40.63, -74.76], 'ALY': [42.95, -78.87], 'BUF': [42.93, -78.73], 'BGM': [42.76, -77.72], 'BOX': [41.48, -71.31], 'BTV': [44.47, -72.68], 'GYX': [43.22, -70.88], 'CAR': [44.69, -69.49]
+    }
+state_abbreviations = {'Canada': 'CAN', 'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY'}
+
+def main():
+    """Main execution function."""
+    print("=" * 60)
+    print("Shane's NWS Discussion Scraper v2.0 - AI Enhanced")
+    print("=" * 60)
+    
+    execution_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    version = "2.0.0 (AI-Powered)"
+    
+    print(f"\n🤖 AI Summary Module: {'ENABLED' if summarizer else 'DISABLED (no API key)'}")
+    print(f"⏰ Execution time: {execution_time}\n")
+    
+    # Process all offices
+    processed_data = {
+        'summaries': {},
+        'keyword_map': defaultdict(list),
+        'keyword_counts': defaultdict(int),
+        'keyword_occurrences': defaultdict(list),
+        'map_html': '',
+        'base_url': ''
+    }
+    
+    # Fetch map
+    offices_to_plot = {o: c for o, c in nws_office_coords.items() 
+                      if any(o in offices for offices in all_offices_synoptic.values())}
+    processed_data['map_html'] = create_folium_map(offices_to_plot)
+    processed_data['base_url'] = 'https://forecast.weather.gov/product.php?site='
+    
+    print(f"\n📡 Fetching {len(offices_to_plot)} forecast discussions...")
+    print("-" * 60)
+    
+    # Process each office
+    for state, offices in all_offices_synoptic.items():
+        state_abbrev = get_state_abbrev(state)
+        for i, office in enumerate(offices):
+            print(f"  [{office}] ", end="", flush=True)
+            
+            try:
+                # Small delay between requests to avoid rate limiting
+                import time
+                if i > 0:
+                    time.sleep(0.5)
+                
+                # Fetch discussion
+                # Fetch discussion with 12-second delay between requests (to respect NWS rate limits)
+                discussion, url, timestamp = fetch_afd(office)
+                
+                # Log timestamp if available
+                if timestamp:
+                    print(f"   ✓ {office}: {timestamp.strftime('%Y-%m-%d %H:%M UTC')}")
+                else:
+                    print(f"   ✓ {office}: fetched")
+                
+                # Extract keywords
+                keyword_summary, keyword_counts = [], defaultdict(int)
+                
+                # Respect NWS rate limits - sleep 12 seconds between requests
+                time.sleep(12)
+                sentences = re.split(r'(?<=[.!?])\s+', discussion.replace('\n', ' '))
+                
+                for sentence in sentences:
+                    matching_kws = [k for k in KEYWORDS 
+                                   if re.search(r'\b' + re.escape(k) + r'\b', sentence, re.IGNORECASE)]
+                    if matching_kws:
+                        clean_sent = sentence.strip()
+                        if clean_sent not in keyword_summary:
+                            keyword_summary.append(clean_sent)
+                        for kw in matching_kws:
+                            keyword_counts[kw.lower()] += 1
+                            # Track occurrence with office info
+                            processed_data['keyword_occurrences'][kw.lower()].append({
+                                'office': office,
+                                'state': state_abbrev,
+                                'text': clean_sent
+                            })
+                
+                # Generate AI summary
+                ai_summary = get_ai_summary(discussion)
+                
+                processed_data['summaries'][state_abbrev][office] = {
+                    'full_text': discussion,
+                    'url': url,
+                    'keyword_summary': keyword_summary,
+                    'keyword_counts': dict(keyword_counts),
+                    'ai_summary': ai_summary
+                }
+
+                # Update global keyword counts
+                for kw, count in keyword_counts.items():
+                    processed_data['keyword_counts'][kw] += count
+                    processed_data['keyword_map'][kw][state_abbrev].append(office)
+                
+                print("✓")
+                
+            except Exception as e:
+                print(f"✗ Error ({state_abbrev}): {e}")
+    
+    # Generate dashboard
+    print("\n" + "=" * 60)
+    print("📊 Generating Dashboard...")
+    
+    dashboard_html = generate_dashboard_html(
+        processed_data,
+        execution_time,
+        version
+    )
+    
+    # Save output files
+    # Save as HTML file
+    html_output_path = os.path.join(DATA_DIR, "shanes_nws_dashboard_v2.html")
+    with open(html_output_path, 'w', encoding='utf-8') as f:
+        f.write(dashboard_html)
+    
+    # Also save as .txt file for compatibility
+    output_path = os.path.join(DATA_DIR, "shanes_nws_dashboard_v2.txt")
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(dashboard_html)
+    
+    print(f"\n✓ Dashboard saved to:")
+    print(f"   HTML: {html_output_path}")
+    print(f"   TXT:  {output_path}")
+    print(f"📁 File size: {os.path.getsize(html_output_path) / 1024:.1f} KB")
+    
+    # Open in browser if on local machine
+    if os.name != 'nt':
+        print("\n🌐 Opening dashboard in browser...")
+        import webbrowser
+        webbrowser.open('file://' + output_path)
+    
+    print("\n" + "=" * 60)
+    print(f"✓ Processing complete! {len(offices_to_plot)} offices processed.")
+    print("=" * 60)
+    
+    return dashboard_html
+
+
+if __name__ == '__main__':
+    main()

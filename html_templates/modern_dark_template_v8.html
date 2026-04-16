@@ -1,0 +1,431 @@
+<!-- Modern Dark Mode HTML Template v8.0.0 — Ops Dashboard Aesthetic -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synoptic Scraper v8</title>
+    <style>
+        :root {
+            /* Ops Dashboard palette — unified dark HUD */
+            --bg-deep: #0a0e17;
+            --bg-panel: #111827;
+            --bg-card: #1a2332;
+            --border: #2a3a4e;
+            --text: #e2e8f0;
+            --text-dim: #64748b;
+            --accent: #38bdf8;
+            --accent2: #818cf8;
+            --green: #34d399;
+            --red: #f87171;
+            --amber: #fbbf24;
+            --orange: #fb923c;
+
+            /* Synoptic feature pills */
+            --pill-front: #dc2626;
+            --pill-trough: #f97316;
+            --pill-dryline: #eab308;
+            --pill-ridge: #34d399;
+            --pill-shortwave: #f59e0b;
+            --pill-jetstreak: #38bdf8;
+            --pill-low: #3b82f6;
+            --pill-record: #ec4899;
+
+            /* Aliases for inline references from Python-generated HTML */
+            --accent-cyan: var(--accent);
+            --accent-emerald: var(--green);
+            --accent-violet: var(--accent2);
+            --accent-rose: var(--red);
+            --accent-amber: var(--amber);
+            --bg-primary: var(--bg-deep);
+            --bg-secondary: var(--bg-panel);
+            --bg-tertiary: var(--bg-card);
+            --text-primary: var(--text);
+            --text-secondary: var(--text-dim);
+            --text-muted: var(--text-dim);
+
+            /* Spacing */
+            --card-radius: 8px;
+            --pill-radius: 12px;
+            --container-max: 1400px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg-deep);
+            color: var(--text);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            line-height: 1.5;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+
+        .hud { max-width: var(--container-max); margin: 0 auto; padding: 16px; }
+
+        /* ── Top Bar ──────────────────────── */
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 20px; margin-bottom: 16px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--card-radius);
+        }
+        .topbar-left { display: flex; align-items: center; gap: 12px; }
+        .topbar-title { font-size: 1.1em; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+        .topbar-sub { font-size: 0.75em; color: var(--text-dim); letter-spacing: 1px; }
+        .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 0.8em; color: var(--text-dim); }
+        .pulse { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .pulse-ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+        /* ── Nav Pills ───────────────────── */
+        .nav-pills {
+            display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+            padding: 10px 16px; margin-bottom: 16px;
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--card-radius);
+        }
+        .nav-pill {
+            padding: 5px 12px; border-radius: 6px;
+            font-size: 0.72em; font-weight: 600; letter-spacing: 1px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text-dim); text-decoration: none;
+            transition: all 0.2s; white-space: nowrap; cursor: pointer;
+        }
+        .nav-pill:hover { border-color: var(--accent); color: var(--accent); }
+        .nav-pill.active { background: rgba(56,189,248,0.12); border-color: var(--accent); color: var(--accent); }
+        .nav-pill.dashboard-link {
+            background: rgba(129,140,248,0.12); border-color: var(--accent2); color: var(--accent2);
+        }
+        .nav-pill.dashboard-link:hover { background: rgba(129,140,248,0.2); }
+        .nav-divider {
+            width: 1px; height: 20px; background: var(--border); margin: 0 6px;
+        }
+
+        /* ── Grid Layout ─────────────────── */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 16px;
+        }
+
+        /* ── Panel ────────────────────────── */
+        .panel {
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--card-radius);
+            overflow: hidden;
+        }
+        .panel-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; border-bottom: 1px solid var(--border);
+            background: rgba(56,189,248,0.04);
+        }
+        .panel-head h2 {
+            font-size: 0.82em; font-weight: 600; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--accent);
+        }
+        .panel-pill {
+            font-size: 0.7em; padding: 2px 10px; border-radius: 12px;
+            font-weight: 600; letter-spacing: 1px;
+        }
+        .pill-ok { background: rgba(52,211,153,0.15); color: var(--green); }
+        .pill-warn { background: rgba(251,191,36,0.15); color: var(--amber); }
+        .pill-err { background: rgba(248,113,113,0.15); color: var(--red); }
+        .pill-info { background: rgba(56,189,248,0.15); color: var(--accent); }
+        .panel-body { padding: 16px; }
+
+        /* ── Sidebar ──────────────────────── */
+        .hud-panel {
+            background: var(--bg-panel); border: 1px solid var(--border);
+            border-radius: var(--card-radius); padding: 16px;
+            height: 100vh; overflow-y: auto;
+            position: sticky; top: 16px;
+        }
+        .hud-panel h2 {
+            font-size: 0.82em; font-weight: 600; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--green);
+            margin-top: 20px; margin-bottom: 12px;
+            padding-bottom: 8px; border-bottom: 2px solid var(--border);
+        }
+        .hud-panel h2:first-child { margin-top: 0; }
+
+        /* ── Stats pills ──────────────────── */
+        .stats-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .stat-pill {
+            background: var(--bg-card); padding: 4px 10px;
+            border-radius: 12px; font-size: 0.72em;
+            border: 1px solid var(--border); color: var(--text-dim);
+        }
+        .stat-pill b { color: var(--text); font-weight: 500; }
+
+        /* ── Keyword section ──────────────── */
+        .keyword-section { margin-top: 16px; max-height: 500px; overflow-y: auto; }
+        .keyword-item {
+            margin: 8px 0; padding: 8px 10px; background: var(--bg-card);
+            border-radius: 6px; border-left: 3px solid var(--accent);
+        }
+        .keyword-label { font-size: 0.78em; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+        .keyword-link-list { display: flex; flex-wrap: wrap; gap: 4px; }
+        .keyword-link {
+            background: var(--bg-panel); padding: 2px 8px;
+            border-radius: 6px; font-size: 0.68em; text-decoration: none;
+            color: var(--text-dim); border: 1px solid var(--border);
+            transition: all 0.15s;
+        }
+        .keyword-link:hover { color: var(--text); border-color: var(--accent); }
+
+        /* ── Content Sections ─────────────── */
+        .content-section {
+            background: var(--bg-panel); border: 1px solid var(--border);
+            border-radius: var(--card-radius); margin-bottom: 16px; overflow: hidden;
+        }
+        .section-header {
+            padding: 10px 16px; background: rgba(56,189,248,0.04);
+            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .section-title {
+            font-size: 0.82em; font-weight: 600; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--accent2);
+        }
+        .badge {
+            padding: 2px 10px; border-radius: 12px;
+            font-size: 0.7em; font-weight: 600; letter-spacing: 1px;
+        }
+
+        /* ── Office Cards ─────────────────── */
+        .office-card {
+            background: var(--bg-deep); border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            margin: 12px; padding: 14px; border-radius: 6px;
+            transition: border-color 0.2s;
+        }
+        .office-card:hover { border-color: var(--green); }
+        .office-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+        }
+        .office-id {
+            font-size: 1.15em; font-weight: 700; letter-spacing: 2px; color: var(--text);
+        }
+        .office-meta { font-size: 0.72em; color: var(--text-dim); letter-spacing: 1px; }
+        .office-link {
+            color: var(--accent); text-decoration: none; font-size: 0.72em;
+            font-weight: 600; letter-spacing: 1px; transition: color 0.15s;
+        }
+        .office-link:hover { color: var(--green); text-decoration: underline; }
+
+        /* ── HUD Pills (synoptic features) — subdued outline style ── */
+        .hud-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .hud-pill {
+            padding: 2px 8px; border-radius: 6px;
+            font-size: 0.72em; font-weight: 600;
+            border: 1px solid; background: transparent;
+        }
+        .hud-pill.front { color: #f87171; border-color: rgba(220,38,38,0.5); background: rgba(220,38,38,0.08); }
+        .hud-pill.trough { color: #fb923c; border-color: rgba(249,115,22,0.5); background: rgba(249,115,22,0.08); }
+        .hud-pill.dryline { color: #facc15; border-color: rgba(234,179,8,0.5); background: rgba(234,179,8,0.08); }
+        .hud-pill.ridge { color: #4ade80; border-color: rgba(52,211,153,0.5); background: rgba(52,211,153,0.08); }
+        .hud-pill.shortwave { color: #fbbf24; border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.08); }
+        .hud-pill.jet-streak { color: #38bdf8; border-color: rgba(56,189,248,0.5); background: rgba(56,189,248,0.08); }
+        .hud-pill.low { color: #60a5fa; border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.08); }
+        .hud-pill.surface-low { color: #60a5fa; border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.08); }
+        .hud-pill.upper-low { color: #818cf8; border-color: rgba(129,140,248,0.5); background: rgba(129,140,248,0.08); }
+        .hud-pill.record { color: #f472b6; border-color: rgba(236,72,153,0.5); background: rgba(236,72,153,0.08); }
+        .hud-pill.record-high { color: #f472b6; border-color: rgba(236,72,153,0.5); background: rgba(236,72,153,0.08); }
+        .hud-pill.record-low { color: #60a5fa; border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.08); }
+        .hud-pill.record-precipitation { color: #34d399; border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.08); }
+        .hud-pill.record-snowfall { color: #94a3b8; border-color: rgba(148,163,184,0.5); background: rgba(148,163,184,0.08); }
+        .hud-pill.arctic { color: #60a5fa; border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.08); }
+
+        /* ── AI Summary ───────────────────── */
+        .ai-summary {
+            background: var(--bg-card); border-left: 3px solid var(--accent2);
+            padding: 12px; font-size: 0.85em;
+            line-height: 1.6; border-radius: 0 6px 6px 0;
+        }
+        .ai-label {
+            font-size: 0.68em; text-transform: uppercase; color: var(--accent2);
+            font-weight: 600; letter-spacing: 1px; margin-bottom: 6px; display: block;
+        }
+
+        /* ── Collapsible Sections ──────────── */
+        .collapsible-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 14px; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 6px; cursor: pointer; font-size: 0.75em;
+            color: var(--text-dim); font-family: inherit; letter-spacing: 1px;
+            transition: all 0.2s; width: 100%; text-align: left;
+            margin-top: 8px;
+        }
+        .collapsible-header:hover { background: var(--bg-deep); border-color: var(--accent); color: var(--text); }
+        .collapsible-header::before { content: "▶"; font-size: 0.7em; margin-right: 8px; transition: transform 0.2s; }
+        .collapsible-header.open::before { transform: rotate(90deg); }
+        .collapsible-body {
+            max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+        }
+        .collapsible-body.open { max-height: none; overflow: visible; }
+
+        /* ── Keyword highlight (inline in discussion) */
+        .kw { 
+            padding: 1px 5px; border-radius: 4px; font-size: 0.85em; font-weight: 600;
+            border: 1px solid; background: transparent;
+        }
+        .kw.front { color: #f87171; border-color: rgba(220,38,38,0.4); background: rgba(220,38,38,0.06); }
+        .kw.trough { color: #fb923c; border-color: rgba(249,115,22,0.4); background: rgba(249,115,22,0.06); }
+        .kw.dryline { color: #facc15; border-color: rgba(234,179,8,0.4); background: rgba(234,179,8,0.06); }
+        .kw.ridge { color: #4ade80; border-color: rgba(52,211,153,0.4); background: rgba(52,211,153,0.06); }
+        .kw.shortwave { color: #fbbf24; border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.06); }
+        .kw.jet-streak { color: #38bdf8; border-color: rgba(56,189,248,0.4); background: rgba(56,189,248,0.06); }
+        .kw.low, .kw.surface-low { color: #60a5fa; border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.06); }
+        .kw.upper-low { color: #818cf8; border-color: rgba(129,140,248,0.4); background: rgba(129,140,248,0.06); }
+
+        /* ── CONUS Summary ────────────────── */
+        .conus-summary {
+            margin-bottom: 24px; padding: 0;
+            background: var(--bg-panel); border: 1px solid var(--border);
+            border-radius: var(--card-radius); overflow: hidden;
+        }
+        .conus-summary details summary {
+            cursor: pointer; padding: 12px 16px; font-size: 0.82em;
+            font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+            color: var(--accent); list-style: none;
+            background: rgba(56,189,248,0.04); border-bottom: 1px solid var(--border);
+        }
+        .conus-summary details summary::-webkit-details-marker { display: none; }
+        .conus-summary details summary::before { content: "\25B6 "; font-size: 0.7em; }
+        .conus-summary details[open] summary::before { content: "\25BC "; }
+        .conus-summary details > div { padding: 16px; font-size: 0.85em; line-height: 1.7; }
+
+        /* ── State Headers ────────────────── */
+        h2[id] {
+            font-size: 0.92em; font-weight: 700; letter-spacing: 3px;
+            text-transform: uppercase; color: var(--accent2);
+            padding: 10px 0; margin: 24px 0 12px 0;
+            border-bottom: 2px solid var(--border);
+        }
+
+        /* ── Code / Pre ──────────────────── */
+        .keyword-line {
+            padding: 4px 0; font-size: 0.78em; line-height: 1.6;
+        }
+        pre {
+            white-space: pre-wrap; word-wrap: break-word;
+            background: var(--bg-deep); padding: 12px; border-radius: 6px;
+            font-size: 0.9em; overflow-x: auto; border: 1px solid var(--border);
+            line-height: 1.7;
+        }
+
+        /* ── Office Footer ────────────────── */
+        .office-footer {
+            margin-top: 10px; padding: 8px 10px; background: var(--bg-deep);
+            border-radius: 6px; font-size: 0.72em; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+
+        /* ── Links ────────────────────────── */
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ── Footer ───────────────────────── */
+        .hud-footer {
+            text-align: center; padding: 24px; color: var(--text-dim);
+            font-size: 0.72em; border-top: 1px solid var(--border);
+            margin-top: 32px; letter-spacing: 1px;
+        }
+
+        /* ── Scrollbar ────────────────────── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+        /* ── Print ─────────────────────────── */
+        @media print {
+            body { padding: 0; background: #fff; color: #000; }
+            .hud-panel, .nav-pills, .collapsible-header, .hud-footer, .topbar { display: none; }
+            .content-section { border: 1px solid #000; }
+            pre { background: #f5f5f5; border: 1px solid #ccc; }
+        }
+
+        /* ── Mobile ───────────────────────── */
+        @media (max-width: 768px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .hud-panel { height: auto; position: static; max-height: 400px; }
+        }
+    </style>
+</head>
+<body>
+<div class="hud">
+    <!-- Top Bar -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <span class="topbar-title">SYNOPTIC SCRAPER v8</span>
+            <span class="topbar-sub" id="execTime">{EXEC_TIME}</span>
+        </div>
+        <div class="topbar-right">
+            <span><span class="pulse pulse-ok"></span>COMPILED</span>
+            <span id="clock"></span>
+        </div>
+    </div>
+
+    <!-- Navigation Pills -->
+    <nav class="nav-pills" id="state-nav">
+        <a class="nav-pill dashboard-link" href="http://localhost:5000" target="_blank">OPS DASHBOARD</a>
+        <span class="nav-divider"></span>
+        {STATE_PILLS}
+    </nav>
+
+    <!-- Main Grid -->
+    <div class="dashboard-grid">
+        <!-- Sidebar -->
+        <aside class="hud-panel">
+            <h2>Keyword Office Links</h2>
+            <div class="keyword-section" id="keyword-office-links">
+                {KEYWORD_OFFICE_LINKS}
+            </div>
+
+            <h2>Data Sources</h2>
+            <div class="stats-list">
+                <span class="stat-pill">LM: <b>10.0.0.222:1234</b></span>
+                <span class="stat-pill">MODEL: <b>qwen2-7b-instruct</b></span>
+                <span class="stat-pill">API: <b>NWS.gov</b></span>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                <a href="#top" class="office-link" style="text-decoration: none; display: block; font-size: 0.78em;">↑ TOP</a>
+            </div>
+        </aside>
+
+        <!-- Content -->
+        <main>
+            {CONTENT_PANE}
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="hud-footer">
+        Shane's Synoptic Scraper v8.0.0 &bull; Generated {EXEC_TIME} &bull; <a href="http://localhost:5000">Ops Dashboard</a>
+    </footer>
+</div>
+
+<script>
+// Live clock
+(function() {
+    function tick() {
+        var now = new Date();
+        var h = String(now.getUTCHours()).padStart(2, '0');
+        var m = String(now.getUTCMinutes()).padStart(2, '0');
+        var s = String(now.getUTCSeconds()).padStart(2, '0');
+        var el = document.getElementById('clock');
+        if (el) el.textContent = h + ':' + m + ':' + s + ' Z';
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+
+function toggleSection(id) {
+    const body = document.getElementById(id);
+    const header = body.previousElementSibling;
+    body.classList.toggle('open');
+    header.classList.toggle('open');
+}
+</script>
+</body>
+</html>

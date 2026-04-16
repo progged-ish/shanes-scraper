@@ -1,0 +1,27 @@
+To: channing.weinmeister.1@us.af.mil
+From: progged-ish@25thsqs.af.mil
+Subject: NWS Discussion Dashboard - April 1, 2026
+
+ATTACHMENT: shanes_nws_dashboard_v2.html
+
+---
+
+Dear Channing,
+
+Please find attached today's NWS Discussion Dashboard for all 119 forecast offices.
+
+The dashboard includes:
+- Interactive map of all forecast offices
+- AI-generated summaries for each office
+- Keyword extraction and analysis
+- Full forecast discussion text
+
+To view: Open the attached HTML file in any web browser.
+
+Best regards,
+progged-ish
+25th Operational Weather Squadron
+
+Date: 2026-04-01 03:06 UTC
+Status: Email delivery failed via SMTP (smtp.us.af.mil unreachable)
+Action Required: Please manually send via MHS

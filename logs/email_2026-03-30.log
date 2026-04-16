@@ -1,0 +1,3 @@
+2026-03-30 05:07:00,653 - INFO - Dashboard file found: /home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.txt (1411.8 KB)
+2026-03-30 05:07:00,653 - ERROR - FROM_PASSWORD not configured
+2026-03-30 05:07:00,653 - ERROR - Aborted: Email configuration incomplete
