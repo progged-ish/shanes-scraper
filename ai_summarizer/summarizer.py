@@ -5,9 +5,13 @@ from typing import Dict, Any
 from openai import OpenAI
 
 # Client configuration for Ollama Cloud Pro
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "")
+if not OLLAMA_API_KEY:
+    raise ValueError("OLLAMA_API_KEY environment variable is not set")
+
 FAST_MODEL_CLIENT = OpenAI(
     base_url="https://ollama.com/v1",
-    api_key="REDACTED"
+    api_key=OLLAMA_API_KEY
 )
 
 
@@ -70,7 +74,9 @@ class HermesSummarizer:
     """
     
     def __init__(self, api_key: str = None, local_url: str = None, base_url: str = "https://api.hermes.nousresearch.com/v1"):
-        self.api_key = api_key or "REDACTED"
+        self.api_key = api_key or os.environ.get("OLLAMA_API_KEY", "")
+        if not self.api_key:
+            raise ValueError("OLLAMA_API_KEY environment variable is not set")
         self.base_url = base_url
         self.local_url = local_url
         self._cache = {}
