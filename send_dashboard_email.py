@@ -17,17 +17,17 @@ from email.mime.application import MIMEApplication
 from datetime import datetime
 from pathlib import Path
 
-# Configuration - UPDATE THESE VALUES
+# Configuration — loaded from environment variables
 CONFIG = {
-    "from_email": "progged-ish@25thsqs.af.mil",
-    "from_password": "REDACTED",
-    "smtp_server": "smtp.us.af.mil",
-    "smtp_port": 587,
-    "recipients": ["channing.weinmeister.1@us.af.mil"],
-    "subject": "NWS Discussion Dashboard - Daily",
-    "dashboard_path": "/home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.html",
-    "max_retries": 3,
-    "retry_delay": 300,  # 5 minutes
+    "from_email": os.environ.get("SMTP_FROM_EMAIL", ""),
+    "from_password": os.environ.get("SMTP_FROM_PASSWORD", ""),
+    "smtp_server": os.environ.get("SMTP_SERVER", "smtp.us.af.mil"),
+    "smtp_port": int(os.environ.get("SMTP_PORT", "587")),
+    "recipients": [r.strip() for r in os.environ.get("SMTP_TO_EMAIL", "").split(",") if r.strip()],
+    "subject": os.environ.get("SMTP_SUBJECT", "NWS Discussion Dashboard - Daily"),
+    "dashboard_path": os.environ.get("DASHBOARD_PATH", "/home/progged-ish/projects/shanes-scraper/data/shanes_nws_dashboard_v2.html"),
+    "max_retries": int(os.environ.get("SMTP_MAX_RETRIES", "3")),
+    "retry_delay": int(os.environ.get("SMTP_RETRY_DELAY", "300")),
 }
 
 # Logging setup

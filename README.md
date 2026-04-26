@@ -34,7 +34,7 @@
 ```json
 {
     "sender_email": "progged@gmail.com",
-    "sender_password": "REDACTED",
+    "sender_password": "YOUR_APP_PASSWORD_HERE",
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 587,
     "recipient_email": "progged@gmail.com, channing.weinmeister.1@us.af.mil",
